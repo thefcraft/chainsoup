@@ -9,7 +9,7 @@ argument resolution.
 
 from typing import Any, Generic, TypeVar, overload, Literal, Sequence
 from enum import Enum
-
+from .types import Strainable
 
 class SpecalArg(Enum):
     """
@@ -99,67 +99,78 @@ def resolve_value(values: Sequence[V | Default],
     if specal == SpecalArg.FILLFALSE:
         return resolved_values + [False]*left
     return resolved_values + [None]*left
-class NestedArg(NestedArgBase[V]):
-    """
-    A fluent builder for creating a sequence of arguments for nested searches.
-
-    This class allows users to chain values together using the `add()` or `then()` method
-    or the `>>` operator to define a different argument for each level of a
-    `find_nested_tag` operation.
-
-    Example:
-        # To specify names for a 3-level search:
-        NestedArg().add('div').add('p').add('a')
-        # Or using the operator:
-        NestedArg() >> 'div' >> 'p' >> 'a'
-    """
-    def copy(self) -> "NestedArg[V]":
-        result = NestedArg()
+    
+class BaseNestedStrainableArgBase(NestedArgBase[Strainable | None]): ...
+class BaseNestedStrainableArg(BaseNestedStrainableArgBase): 
+    def copy(self) -> "BaseNestedStrainableArg":
+        result = BaseNestedStrainableArg()
         result.values = self.values.copy()
         result.specal = self.specal
         return result
     @overload
-    def add(self, value: SpecalArg) -> NestedArgBase[V]: ...
+    def add(self, value: SpecalArg) -> BaseNestedStrainableArgBase: ...
     @overload
-    def add(self, value: V) -> "NestedArg[V]": ...
-    def add(self, value: V | SpecalArg) -> "NestedArg[V] | NestedArgBase[V]":
-        """
-        Adds a value or a special resolution strategy to the argument list.
-
-        Args:
-            value: The argument value for the next level of the search, or
-                   a `SpecalArg` to define the padding behavior.
-
-        Returns:
-            The `NestedArg` instance for further chaining, or the base class `NestedArgBase`
-            if a `SpecalArg` was added.
-        """
+    def add(self, value: Strainable | None) -> "BaseNestedStrainableArg": ...
+    def add(self, value: Strainable | None | SpecalArg) -> "BaseNestedStrainableArg | BaseNestedStrainableArgBase":
         result = self.copy()
         if isinstance(value, SpecalArg):
             result.specal = value
             return result
         result.values.append(value)
         return result
-    @overload
-    def then(self, value: SpecalArg) -> NestedArgBase[V]: ...
-    @overload
-    def then(self, value: V) -> "NestedArg[V]": ...
-    def then(self, value: V | SpecalArg) -> "NestedArg[V] | NestedArgBase[V]":
-        """An alias for the `add` method for a more fluent interface."""
-        return self.add(value)
-    @overload
-    def __rshift__(self, value: SpecalArg) -> NestedArgBase[V]: ...
-    @overload
-    def __rshift__(self, value: V) -> "NestedArg[V]": ...
-    def __rshift__(self, value: V | SpecalArg) -> "NestedArg[V] | NestedArgBase[V]": 
-        """
-        An alias for the `add` method using the `>>` operator for chaining.
+    then = add
+    __rshift__ = add
+NestedNameArgBase = BaseNestedStrainableArgBase
+NestedNameArg = BaseNestedStrainableArg
+NestedStringArgBase = BaseNestedStrainableArgBase
+NestedStringArg = BaseNestedStrainableArg
 
-        Args:
-            value: The argument value or `SpecalArg` to add.
+K = TypeVar('K', dict[str, Strainable | None] | Strainable | None, Strainable | Default | None)
+class BaseNestedAttrsArgBase(NestedArgBase[K]): ...
+class BaseNestedAttrsArg(BaseNestedAttrsArgBase[K]): 
+    def copy(self) -> "BaseNestedAttrsArg[K]":
+        result = BaseNestedAttrsArg()
+        result.values = self.values.copy()
+        result.specal = self.specal
+        return result
+    @overload
+    def add(self, value: SpecalArg) -> BaseNestedAttrsArgBase[K]: ...
+    @overload
+    def add(self, value: K) -> "BaseNestedAttrsArg[K]": ...
+    def add(self, value: K | SpecalArg) -> "BaseNestedAttrsArg[K] | BaseNestedAttrsArgBase[K]":
+        result = self.copy()
+        if isinstance(value, SpecalArg):
+            result.specal = value
+            return result
+        result.values.append(value)
+        return result
+    then = add
+    __rshift__ = add
 
-        Returns:
-            The `NestedArg` instance for further chaining, or the base class `NestedArgBase`
-            if a `SpecalArg` was added.
-        """
-        return self.add(value)
+NestedAttrArgBase = BaseNestedAttrsArgBase[Strainable | Default | None]
+NestedAttrArg = BaseNestedAttrsArg[Strainable | Default | None]
+NestedAttrsArgBase = BaseNestedAttrsArgBase[dict[str, Strainable | None] | Strainable | None]
+NestedAttrsArg = BaseNestedAttrsArg[dict[str, Strainable | None] | Strainable | None]
+
+class NestedRecursiveArgBase(NestedArgBase[bool | Default]): ...
+class NestedRecursiveArg(NestedRecursiveArgBase): 
+    def copy(self) -> "NestedRecursiveArg":
+        result = NestedRecursiveArg()
+        result.values = self.values.copy()
+        result.specal = self.specal
+        return result
+    @overload
+    def add(self, value: SpecalArg) -> NestedRecursiveArgBase: ...
+    @overload
+    def add(self, value: bool | Default) -> "NestedRecursiveArg": ...
+    def add(self, value: bool | Default | SpecalArg) -> "NestedRecursiveArg | NestedRecursiveArgBase":
+        result = self.copy()
+        if isinstance(value, SpecalArg):
+            result.specal = value
+            return result
+        result.values.append(value)
+        return result
+    then = add
+    __rshift__ = add
+# string: NestedArgBase[Strainable | None] = NestedArg(),
+# **kwargs: NestedArgBase[Strainable | Default | None],

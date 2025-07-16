@@ -11,19 +11,9 @@ from typing import TypeAlias, Callable, Iterable, Any, TypeVar, Generic, Literal
 from re import Pattern
 from bs4.element import Tag, NavigableString, PageElement
 
-from .args import NestedArgBase, NestedArg, resolve_value, Default
+from .args import resolve_value, Default, NestedNameArgBase, NestedNameArg, NestedAttrsArgBase, NestedRecursiveArg, NestedRecursiveArgBase, NestedStringArgBase, NestedStringArg, NestedAttrArgBase
 from .exceptions import Error, ElementNotFound, UnknownElement, AssertError, IndexOutError
-
-# Type Aliases for BeautifulSoup's filter arguments
-SimpleStrainable: TypeAlias = (
-    str
-    | bool
-    | bytes
-    | Pattern[str]
-    | Callable[[str], bool]
-    | Callable[[Tag], bool]
-)
-Strainable: TypeAlias = SimpleStrainable | Iterable[SimpleStrainable]
+from .types import Strainable
 
 T = TypeVar("T", bound=PageElement)
 
@@ -268,11 +258,11 @@ class Pipeline:
         return pipeline
     def find_nested_tag(
         self,
-        name: NestedArgBase[Strainable | None] = NestedArg(),
-        attrs: NestedArgBase[dict[str, Strainable | None] | Strainable | None] | dict[str, NestedArgBase[Strainable | Default | None]] = {},
-        recursive: NestedArgBase[bool | Default] = NestedArg(),
-        string: NestedArgBase[Strainable | None] = NestedArg(),
-        **kwargs: NestedArgBase[Strainable | Default | None],
+        name: NestedNameArgBase = NestedNameArg(),
+        attrs: dict[str, NestedAttrArgBase] | NestedAttrsArgBase = {},
+        recursive: NestedRecursiveArgBase = NestedRecursiveArg(),
+        string: NestedStringArgBase = NestedStringArg(),
+        **kwargs: NestedAttrArgBase,
     ) -> "Pipeline":
         """
         Adds multiple `find_tag` operations to the pipeline to locate a deeply nested tag.
