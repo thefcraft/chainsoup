@@ -1,104 +1,233 @@
 from setuptools import setup, find_packages
-long_description = """# CacheRequests
+long_description = """# ChainableSoup
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/thefcraft/CacheRequests)
-[![PyPI version](https://badge.fury.io/py/PersistentRequests.svg)](https://badge.fury.io/py/PersistentRequests)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/thefcraft/ChainableSoup)
+[![PyPI version](https://badge.fury.io/py/ChainableSoup.svg)](https://badge.fury.io/py/ChainableSoup)
 
-CacheRequests is a Python library that provides a simple and effective caching layer for your web requests. It's built on top of the popular `requests` library and is designed to be a drop-in replacement for `requests.Session`.
+**ChainableSoup** provides a fluent, pipeline-based interface for querying HTML and XML documents with BeautifulSoup, turning complex nested searches into clean, readable, and chainable method calls.
+
+## The Problem
+
+Working with [BeautifulSoup](https://www.crummy.com/software/BeautifulSoup/bs4/doc/) is great, but navigating deeply nested structures can lead to verbose and hard-to-read code:
+
+```python
+# Standard BeautifulSoup
+try:
+    doc = soup.find('div', class_='document')
+    wrapper = doc.find('div', class_='documentwrapper')
+    body_wrapper = wrapper.find('div', class_='bodywrapper')
+    body = body_wrapper.find('div', class_='body')
+    section = body.find('section', recursive=False)
+    p_tag = section.find_all('p', recursive=False)[0]
+    print(p_tag.text)
+except AttributeError:
+    print("One of the tags was not found.")
+
+```
+
+This pattern is repetitive, and the error handling can obscure the main logic.
+
+## The Solution: A Fluent Pipeline
+
+ChainableSoup elegantly solves this by introducing a `Pipeline` that lets you chain `find` operations. The same query becomes:
+
+```python
+from ChainableSoup import Pipeline
+
+# With ChainableSoup
+pipeline = Pipeline().find_tag('div', class_='document') \
+                     .find_tag('div', class_='documentwrapper') \
+                     .find_tag('div', class_='bodywrapper') \
+                     .find_tag('div', class_='body') \
+                     .find_tag('section', recursive=False) \
+                     .find_all_tags('p', recursive=False)[0]
+
+# Execute the pipeline and get the result
+first_p = pipeline.raise_for_error.run(soup)
+print(first_p.text)
+```
+
+or
+
+```python 
+from ChainableSoup import Pipeline, NestedArg, SpecalArg
+
+# With ChainableSoup
+pipeline = Pipeline().find_nested_tag(
+    name = NestedArg() >> 'div' >> 'div' >> 'div' >> 'div' >> 'section',
+    class_ = NestedArg() >> 'document' >> 'documentwrapper' >> 'bodywrapper' >> 'body',
+    recursive = NestedArg() >> True >> True >> True >> True >> False >> SpecalArg.EXPANDLAST
+).find_all_tags('p', recursive=False)[0]
+
+# Execute the pipeline and get the result
+first_p = pipeline.raise_for_error.run(soup)
+print(first_p.text)
+```
 
 ## Features
 
-*   **Persistent Caching:** Save responses to disk to speed up repeated requests.
-*   **Automatic Cache Invalidation:** Set a time-to-live (TTL) for your cached responses.
-*   **Customizable:** Configure cache directories, refresh policies, and more.
-*   **Easy to Use:** A simple, intuitive API that gets out of your way.
+-   **Fluent Chaining:** Link `find_tag` and `find_all_tags` calls in a natural, readable sequence.
+-   **Powerful Nested Searches:** Use `find_nested_tag` with `NestedArg` to perform complex deep searches with a single method call.
+-   **Sequence Operations:** After a `find_all_tags` call, you can `filter`, `map`, and perform assertions on the sequence of results.
+-   **Robust Error Handling:** Choose your style: either get a descriptive `Error` object back or have an exception raised automatically on failure.
+-   **Intelligent Argument Resolution:** Automatically handle varying arguments for each level of a nested search.
 
 ## Installation
 
-Install CacheFlow using pip:
-
 ```bash
-pip install PersistentRequests
+pip install ChainableSoup
 ```
 
-## Quick Start
+## Quickstart
 
-Here's a simple example of how to use CacheRequests:
+### 1. Basic Find
+
+Create a `Pipeline` and chain `find_tag` calls to navigate to a specific element.
 
 ```python
-from CacheRequests import CacheSession
-from datetime import timedelta
+from bs4 import BeautifulSoup
+from ChainableSoup import Pipeline
 
-# Create a new session with a cache directory
-requests = CacheSession(cache_dir='.cache', refresh_after=timedelta(hours=1)) # or use `from CacheRequests import requests`
+html = """
+<body>
+  <div id="content">
+    <h1>Title</h1>
+    <p>First paragraph.</p>
+    <p>Second paragraph.</p>
+  </div>
+</body>
+"""
+soup = BeautifulSoup(html, 'html.parser')
 
-# Make a request
-response = requests.get('https://api.github.com')
+# Build the pipeline
+pipeline = Pipeline().find_tag('body').find_tag('div', id='content').find_tag('p')
 
-# The response is now cached. Subsequent requests to the same URL will be served from the cache.
-cached_response = requests.get('https://api.github.com')
+# Execute it and raise an exception if any tag is not found
+first_p = pipeline.raise_for_error.run(soup)
+print(first_p.text)
+# Output: First paragraph.
 
-print(response.json())
+# Alternatively, execute without raising an error
+result = pipeline.run(soup)
+if not result:
+    print(f"Pipeline failed: {result.msg}")
+else:
+    print(result.text)
 ```
 
-## Advanced Usage
+### 2. Finding All Tags and Filtering
 
-### Configuration
-
-You can configure the behavior of CacheRequests by passing arguments to the `CacheSession` constructor:
-
-*   `cache_dir`: The directory where cached responses will be stored.
-*   `force_refresh`: If `True`, the cache will be ignored and all requests will be made to the network.
-*   `refresh_after`: A `timedelta` object that specifies how long a cached response is valid.
-*   `refresh_on_error`: If `True`, the cache will be refreshed if a cached response resulted in an error.
-
-### Context Manager
-
-You can also use a context manager to temporarily change the configuration:
+Use `find_all_tags` to get a sequence of results. This returns a `PipelineSequence` object, which you can use to filter, map, or select items.
 
 ```python
-with requests.configure(force_refresh=True):
-    # This request will bypass the cache
-    response = requests.get('https://api.github.com')
+# Continues from the previous example...
+
+# Find all <p> tags inside the div
+p_sequence = Pipeline().find_tag('div', id='content').find_all_tags('p')
+
+# Select the second paragraph (index 1)
+second_p_pipeline = p_sequence[1]
+print(second_p_pipeline.raise_for_error.run(soup).text)
+# Output: Second paragraph.
+
+# Or use .first / .last properties
+first_p_pipeline = p_sequence.first
+print(first_p_pipeline.raise_for_error.run(soup).text)
+# Output: First paragraph.
+
+# Filter the sequence
+contains_second = lambda tag: "Second" in tag.text
+filtered_sequence = p_sequence.filter(contains_second)
+
+# This will now find the first (and only) tag that matches the filter
+result = filtered_sequence.first.raise_for_error.run(soup)
+print(result.text)
+# Output: Second paragraph.
 ```
 
-## Deleting Cache Entries
+## Advanced Usage: `find_nested_tag`
 
-CacheFlow provides multiple ways to manage your cache.
+The `find_nested_tag` method is the most powerful feature of ChainableSoup. It allows you to define an entire path of `find` operations in a single, declarative call using `NestedArg`.
 
-### Deleting by URL
+### `NestedArg`
 
-You can delete cache entries based on a URL pattern:
+An `NestedArg` is a fluent builder for creating a list of arguments, one for each level of the search. You can chain values using the `>>` operator or the `.add()` method.
+
+### Example
+
+Let's revisit the complex example from the introduction.
 
 ```python
-from CacheRequests import delete_cache_by_function
-def should_delete(url: str):
-    return 'github.com' in url
+from ChainableSoup import Pipeline, NestedArg, SpecalArg
 
-delete_cache_by_function(requests, should_delete)
+# ... setup soup ...
+
+pipeline = Pipeline().find_nested_tag(
+    # For each level of the search, specify the tag 'name'
+    name = NestedArg() >> 'body' >> 'div' >> 'div' >> 'div' >> 'div',
+
+    # Specify attributes for each level. The lists are matched by index.
+    attrs={
+        'class': NestedArg() >> None >> 'document' >> 'documentwrapper' >> 'bodywrapper' >> 'body'
+    },
+    
+    # Specify the `recursive` flag. Here, we use a Special Argument.
+    # It will be True, then False, and EXPANDLAST will repeat `False` for the rest.
+    recursive = NestedArg() >> True >> False >> SpecalArg.EXPANDLAST
+
+).find_all_tags(
+    name='section',
+    recursive=False
+).first.find_all_tags(
+    name='p',
+    recursive=False
+)
+
+# Create two branches of the pipeline to get the first and second <p> tags
+first_p_pipeline = pipeline[0]
+second_p_pipeline = pipeline[1]
+
+# Execute both
+print(first_p_pipeline.raise_for_error.run(soup).text)
+print(second_p_pipeline.raise_for_error.run(soup).text)
 ```
-### Deleting by Expiration
 
-You can delete cache entries that are older than a specified timedelta:
+### `SpecalArg` Enum
 
-```python
-from CacheRequests import delete_cache_by_expiration
-from datetime import timedelta
-# Delete all cache entries older than 7 days
-delete_cache_by_expiration(requests, timedelta(days=7))
-```
+When argument lists have different lengths, `SpecalArg` controls how the shorter lists are padded to match the longest one.
 
+-   `SpecalArg.EXPANDLAST`: Repeats the last provided value.
+-   `SpecalArg.FILLNONE`: Fills with `None` (the default).
+-   `SpecalArg.FILLTRUE`: Fills with `True`.
+-   `SpecalArg.FILLFALSE`: Fills with `False`.
+
+## API Overview
+
+-   **`Pipeline`**: The main object for building a query that results in a **single `Tag`**.
+    -   `.find_tag(...)`: Appends a `find` operation.
+    -   `.find_nested_tag(...)`: Appends a series of `find` operations.
+    -   `.find_all_tags(...)`: Transitions the query into a `PipelineSequence`.
+    -   `.run(soup)`: Executes the pipeline and returns a `Tag` or `Error` object.
+    -   `.run_and_raise_for_error(soup)`: Executes and raises an `Error` on failure.
+
+-   **`PipelineSequence`**: An object for building a query that results in a **sequence of `Tag`s**.
+    -   `.filter(fn)`: Filters the sequence.
+    -   `.map(fn)`: Applies a function to each tag in the sequence.
+    -   `.assert_all(fn)`: Asserts a condition for all tags.
+    -   `.first`, `.last`, `[index]`: Selects a single element, returning control to a `Pipeline`.
+
+-   **`NestedArg`**: A helper class to build argument lists for `find_nested_tag`.
 
 ## Contributing
 
-Contributions are welcome! If you have a feature request, bug report, or pull request, please open an issue on GitHub.
+Contributions are welcome! If you have a feature request, find a bug, or want to improve the documentation, please open an issue or submit a pull request on our [GitHub repository](https://github.com/your-username/chainablesoup).
 
 ## License
 
-CacheRequests is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details."""
+This project is licensed under the MIT License."""
 setup(
     name="ChainableSoup",
-    version="0.1.0",
+    version="0.1.1",
     author="ThefCraft",
     author_email="sisodiyalaksh@gmail.com",
     url="https://github.com/thefcraft/ChainableSoup",
