@@ -88,7 +88,7 @@ Create a `Pipeline` and chain `find_tag` calls to navigate to a specific element
 from bs4 import BeautifulSoup
 from ChainableSoup import Pipeline
 
-html = """
+html = '''
 <body>
   <div id="content">
     <h1>Title</h1>
@@ -96,7 +96,7 @@ html = """
     <p>Second paragraph.</p>
   </div>
 </body>
-"""
+'''
 soup = BeautifulSoup(html, 'html.parser')
 
 # Build the pipeline
