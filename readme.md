@@ -1,6 +1,6 @@
 # ChainableSoup
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/your-username/chainablesoup)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/thefcraft/ChainableSoup)
 [![PyPI version](https://badge.fury.io/py/chainablesoup.svg)](https://badge.fury.io/py/chainablesoup)
 
 **ChainableSoup** provides a fluent, pipeline-based interface for querying HTML and XML documents with BeautifulSoup, turning complex nested searches into clean, readable, and chainable method calls.

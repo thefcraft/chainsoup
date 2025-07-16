@@ -8,7 +8,6 @@ argument resolution.
 """
 
 from typing import Any, Generic, TypeVar, overload, Literal
-from typing_extensions import Self
 from enum import Enum
 
 
@@ -43,7 +42,11 @@ class NestedArgBase(Generic[V]):
         """Initializes the NestedArgBase."""
         self.values: list[V] = []
         self.specal: SpecalArg = SpecalArg.FILLNONE
-        
+    def copy(self) -> "NestedArgBase[V]":
+        result = NestedArgBase()
+        result.values = self.values.copy()
+        result.specal = self.specal
+        return result
     def __repr__(self) -> str:
         """Provides a developer-friendly string representation."""
         s = ' > '.join(map(str, self.values))
@@ -102,11 +105,16 @@ class NestedArg(NestedArgBase[V]):
         # Or using the operator:
         NestedArg() >> 'div' >> 'p' >> 'a'
     """
+    def copy(self) -> "NestedArg[V]":
+        result = NestedArg()
+        result.values = self.values.copy()
+        result.specal = self.specal
+        return result
     @overload
     def add(self, value: SpecalArg) -> NestedArgBase[V]: ...
     @overload
-    def add(self, value: V) -> Self: ...
-    def add(self, value: V | SpecalArg) -> Self | NestedArgBase[V]:
+    def add(self, value: V) -> "NestedArg[V]": ...
+    def add(self, value: V | SpecalArg) -> "NestedArg[V] | NestedArgBase[V]":
         """
         Adds a value or a special resolution strategy to the argument list.
 
@@ -118,23 +126,24 @@ class NestedArg(NestedArgBase[V]):
             The `NestedArg` instance for further chaining, or the base class `NestedArgBase`
             if a `SpecalArg` was added.
         """
+        result = self.copy()
         if isinstance(value, SpecalArg):
-            self.specal = value
-            return self
-        self.values.append(value)
-        return self
+            result.specal = value
+            return result
+        result.values.append(value)
+        return result
     @overload
     def then(self, value: SpecalArg) -> NestedArgBase[V]: ...
     @overload
-    def then(self, value: V) -> Self: ...
-    def then(self, value: V | SpecalArg) -> Self | NestedArgBase[V]:
+    def then(self, value: V) -> "NestedArg[V]": ...
+    def then(self, value: V | SpecalArg) -> "NestedArg[V] | NestedArgBase[V]":
         """An alias for the `add` method for a more fluent interface."""
         return self.add(value)
     @overload
     def __rshift__(self, value: SpecalArg) -> NestedArgBase[V]: ...
     @overload
-    def __rshift__(self, value: V) -> Self: ...
-    def __rshift__(self, value: V | SpecalArg) -> Self | NestedArgBase[V]: 
+    def __rshift__(self, value: V) -> "NestedArg[V]": ...
+    def __rshift__(self, value: V | SpecalArg) -> "NestedArg[V] | NestedArgBase[V]": 
         """
         An alias for the `add` method using the `>>` operator for chaining.
 
