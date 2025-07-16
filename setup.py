@@ -227,7 +227,7 @@ Contributions are welcome! If you have a feature request, find a bug, or want to
 This project is licensed under the MIT License."""
 setup(
     name="ChainableSoup",
-    version="0.1.1",
+    version="0.1.2",
     author="ThefCraft",
     author_email="sisodiyalaksh@gmail.com",
     url="https://github.com/thefcraft/ChainableSoup",

@@ -27,7 +27,7 @@ class Error(Exception):
     def __repr__(self) -> str:
         """Provides a developer-friendly string representation."""
         return f"{self.__class__.__name__}(msg={self.msg})"
-    
+    def __str__(self) -> str: return self.__repr__()
 class UnknownElement(Error, Generic[T]):
     """
     Raised when an operation returns an unexpected BeautifulSoup element type.

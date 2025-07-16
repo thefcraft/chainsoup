@@ -7,7 +7,7 @@ also defines the `SpecalArg` enum used to control the behavior of nested
 argument resolution.
 """
 
-from typing import Any, Generic, TypeVar, overload, Literal
+from typing import Any, Generic, TypeVar, overload, Literal, Sequence
 from enum import Enum
 
 
@@ -22,6 +22,8 @@ class SpecalArg(Enum):
     """
     EXPANDLAST = "EXPANDLAST"
     """Repeats the last provided value for any remaining levels."""
+    FILLDEFAULT = "FILLDEFAULT"
+    """Fills any remaining levels with `DEFAULT, like lambda _: True`."""
     FILLNONE = "FILLNONE"
     """Fills any remaining levels with `None`."""
     FILLFALSE = "FILLFALSE"
@@ -29,6 +31,8 @@ class SpecalArg(Enum):
     FILLTRUE = "FILLTRUE"
     """Fills any remaining levels with `True`."""
 
+class Default: ...
+DEFAULT = Default()
 
 V = TypeVar("V")
 class NestedArgBase(Generic[V]):
@@ -41,7 +45,7 @@ class NestedArgBase(Generic[V]):
     def __init__(self) -> None: 
         """Initializes the NestedArgBase."""
         self.values: list[V] = []
-        self.specal: SpecalArg = SpecalArg.FILLNONE
+        self.specal: SpecalArg = SpecalArg.FILLDEFAULT
     def copy(self) -> "NestedArgBase[V]":
         result = NestedArgBase()
         result.values = self.values.copy()
@@ -56,9 +60,10 @@ class NestedArgBase(Generic[V]):
     def __len__(self) -> int:
         """Returns the number of values currently in the argument list."""
         return self.values.__len__()
-def resolve_value(values: list[V], 
+def resolve_value(values: Sequence[V | Default], 
                   specal: SpecalArg, 
-                  max_n: int = -1) -> list[V] | list[V | None] | list[V | bool]:
+                  max_n: int = -1, 
+                  default: V | None = None) -> Sequence[V] | Sequence[V | None] | Sequence[V | bool] | Sequence[V | None | bool]:
     """
     Resolves a list of values to a specific length based on a special behavior.
 
@@ -77,20 +82,23 @@ def resolve_value(values: list[V],
     Raises:
         ValueError: If `specal` is `EXPANDLAST` and `values` is empty.
     """
-    if max_n < 0: return values
-    if len(values) == max_n: return values
-    if len(values) > max_n: return values[:max_n]
-    left: int = max_n - len(values)
+    resolved_values: list[V | None] = [default if isinstance(value, Default) else value for value in values]
+    if max_n < 0: return resolved_values
+    if len(resolved_values) == max_n: return resolved_values
+    if len(resolved_values) > max_n: return resolved_values[:max_n]
+    left: int = max_n - len(resolved_values)
     if specal == SpecalArg.EXPANDLAST:
-        if len(values) == 0: 
+        if len(resolved_values) == 0: 
             raise ValueError(f"{specal} can't use at first place")
-        last = values[-1]
-        return values + [last]*left
+        last = resolved_values[-1]
+        return resolved_values + [last]*left
+    if specal == SpecalArg.FILLDEFAULT:
+        return resolved_values + [default]*left
     if specal == SpecalArg.FILLTRUE:
-        return values + [True]*left
+        return resolved_values + [True]*left
     if specal == SpecalArg.FILLFALSE:
-        return values + [False]*left
-    return values + [None]*left
+        return resolved_values + [False]*left
+    return resolved_values + [None]*left
 class NestedArg(NestedArgBase[V]):
     """
     A fluent builder for creating a sequence of arguments for nested searches.

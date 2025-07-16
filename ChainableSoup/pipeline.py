@@ -11,7 +11,7 @@ from typing import TypeAlias, Callable, Iterable, Any, TypeVar, Generic, Literal
 from re import Pattern
 from bs4.element import Tag, NavigableString, PageElement
 
-from .args import NestedArgBase, NestedArg, resolve_value
+from .args import NestedArgBase, NestedArg, resolve_value, Default
 from .exceptions import Error, ElementNotFound, UnknownElement, AssertError, IndexOutError
 
 # Type Aliases for BeautifulSoup's filter arguments
@@ -269,10 +269,10 @@ class Pipeline:
     def find_nested_tag(
         self,
         name: NestedArgBase[Strainable | None] = NestedArg(),
-        attrs: NestedArgBase[dict[str, Strainable | None] | Strainable | None] | dict[str, NestedArgBase[Strainable | None]] = {},
-        recursive: NestedArgBase[bool] = NestedArg(),
+        attrs: NestedArgBase[dict[str, Strainable | None] | Strainable | None] | dict[str, NestedArgBase[Strainable | Default | None]] = {},
+        recursive: NestedArgBase[bool | Default] = NestedArg(),
         string: NestedArgBase[Strainable | None] = NestedArg(),
-        **kwargs: NestedArgBase[Strainable | None],
+        **kwargs: NestedArgBase[Strainable | Default | None],
     ) -> "Pipeline":
         """
         Adds multiple `find_tag` operations to the pipeline to locate a deeply nested tag.
@@ -302,7 +302,7 @@ class Pipeline:
         # Then, we find the maximum length among any NestedArgs passed in via **kwargs.
         _kwargs_value_max_length: int = max((len(value) for value in kwargs.values()), default=0)
         # The `attrs` argument can be structured in two ways, so it needs special handling.
-        new_attrs: list[dict[str, Strainable | None] | Strainable | None] | list[dict[str, Strainable | None]]
+        new_attrs: Sequence[dict[str, Strainable | None] | Strainable | None]
         
         # --- Step 2: Resolve the `attrs` argument ---
         # Case A: `attrs` is a single NestedArg, e.g., attrs=NestedArg() >> {'class': 'a'} >> {'class': 'b'}
@@ -311,7 +311,7 @@ class Pipeline:
             # The overall depth is the max of all argument lengths seen so far.
             deepest: int = max(_deepest, _kwargs_value_max_length, _attrs_value_max_length)
             # Resolve the single `attrs` NestedArg to match the deepest length.
-            new_attrs = resolve_value(attrs.values, attrs.specal, max_n=deepest)
+            new_attrs = resolve_value(attrs.values, attrs.specal, max_n=deepest, default=lambda _: True)
         # Case B: `attrs` is a dict of NestedArgs, e.g., attrs={'class': NestedArg() >> 'a' >> 'b'}
         else:
             # Find the max length among all NestedArgs inside the `attrs` dictionary.
@@ -320,7 +320,7 @@ class Pipeline:
             deepest: int = max(_deepest, _kwargs_value_max_length, _attrs_value_max_length)
             # First, resolve each individual NestedArg within the dict to the same `deepest` length.
             resolved_attrs = {
-                k: resolve_value(v.values, specal=v.specal, max_n=deepest)
+                k: resolve_value(v.values, specal=v.specal, max_n=deepest, default=lambda _: True)
                 for k, v in attrs.items()
             }
             # Then, "transpose" the dictionary of lists into a list of dictionaries.
@@ -334,7 +334,7 @@ class Pipeline:
         # --- Step 3: Resolve all other arguments to the final `deepest` length ---
         # Resolve the `kwargs` in the same way as the dictionary-based `attrs`.
         resolved_kwargs = {
-            k: resolve_value(v.values, specal=v.specal, max_n=deepest)
+            k: resolve_value(v.values, specal=v.specal, max_n=deepest, default=lambda _: True)
             for k, v in kwargs.items()
         }
         # Transpose the kwargs into a list of dictionaries for each search level.
@@ -344,9 +344,9 @@ class Pipeline:
         ]
         
         # Resolve the simple, direct NestedArgs.
-        new_name = resolve_value(name.values, specal=name.specal, max_n=deepest)
-        new_recursive = resolve_value(recursive.values, specal=recursive.specal, max_n=deepest)
-        new_string = resolve_value(string.values, specal=string.specal, max_n=deepest)
+        new_name = resolve_value(name.values, specal=name.specal, max_n=deepest, default=None)
+        new_recursive = resolve_value(recursive.values, specal=recursive.specal, max_n=deepest, default=True)
+        new_string = resolve_value(string.values, specal=string.specal, max_n=deepest, default=None)
         
         # --- Step 4: Build and append the FindTag operations ---
         # Use `zip` to iterate over all the resolved argument lists simultaneously.

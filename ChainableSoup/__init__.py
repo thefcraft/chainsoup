@@ -8,6 +8,6 @@ expressive way.
 This __init__.py file exposes the primary user-facing classes and enums so
 they can be imported directly from the `ChainableSoup` package.
 """
-from .args import NestedArg, SpecalArg
+from .args import NestedArg, SpecalArg, DEFAULT
 from .exceptions import ElementNotFound, UnknownElement, Error
 from .pipeline import Pipeline, PipelineElement
