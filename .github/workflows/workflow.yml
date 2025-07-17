@@ -1,4 +1,4 @@
-name: Upload Python Package ChainableSoup
+name: Upload Python Package chainsoup
 
 on:
   workflow_dispatch:

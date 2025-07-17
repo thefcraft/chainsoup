@@ -1,9 +1,9 @@
-# ChainableSoup
+# chainsoup
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/thefcraft/ChainableSoup)
-[![PyPI version](https://badge.fury.io/py/ChainableSoup.svg)](https://badge.fury.io/py/ChainableSoup)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/thefcraft/chainsoup)
+[![PyPI version](https://badge.fury.io/py/chainsoup.svg)](https://badge.fury.io/py/chainsoup)
 
-**ChainableSoup** provides a fluent, pipeline-based interface for querying HTML and XML documents with BeautifulSoup, turning complex nested searches into clean, readable, and chainable method calls.
+**chainsoup** provides a fluent, pipeline-based interface for querying HTML and XML documents with BeautifulSoup, turning complex nested searches into clean, readable, and chainable method calls.
 
 ## The Problem
 
@@ -28,12 +28,12 @@ This pattern is repetitive, and the error handling can obscure the main logic.
 
 ## The Solution: A Fluent Pipeline
 
-ChainableSoup elegantly solves this by introducing a `Pipeline` that lets you chain `find` operations. The same query becomes:
+chainsoup elegantly solves this by introducing a `Pipeline` that lets you chain `find` operations. The same query becomes:
 
 ```python
-from ChainableSoup import Pipeline
+from chainsoup import Pipeline
 
-# With ChainableSoup
+# With chainsoup
 pipeline = Pipeline().find_tag('div', class_='document') \
                      .find_tag('div', class_='documentwrapper') \
                      .find_tag('div', class_='bodywrapper') \
@@ -49,9 +49,9 @@ print(first_p.text)
 or
 
 ```python 
-from ChainableSoup import Pipeline, NestedArg, SpecalArg
+from chainsoup import Pipeline, NestedArg, SpecalArg
 
-# With ChainableSoup
+# With chainsoup
 pipeline = Pipeline().find_nested_tag(
     name = NestedArg() >> 'div' >> 'div' >> 'div' >> 'div' >> 'section',
     class_ = NestedArg() >> 'document' >> 'documentwrapper' >> 'bodywrapper' >> 'body',
@@ -74,7 +74,7 @@ print(first_p.text)
 ## Installation
 
 ```bash
-pip install ChainableSoup
+pip install chainsoup
 ```
 
 ## Quickstart
@@ -85,7 +85,7 @@ Create a `Pipeline` and chain `find_tag` calls to navigate to a specific element
 
 ```python
 from bs4 import BeautifulSoup
-from ChainableSoup import Pipeline
+from chainsoup import Pipeline
 
 html = '''
 <body>
@@ -146,7 +146,7 @@ print(result.text)
 
 ## Advanced Usage: `find_nested_tag`
 
-The `find_nested_tag` method is the most powerful feature of ChainableSoup. It allows you to define an entire path of `find` operations in a single, declarative call using `NestedArg`.
+The `find_nested_tag` method is the most powerful feature of chainsoup. It allows you to define an entire path of `find` operations in a single, declarative call using `NestedArg`.
 
 ### `NestedArg`
 
@@ -157,7 +157,7 @@ An `NestedArg` is a fluent builder for creating a list of arguments, one for eac
 Let's revisit the complex example from the introduction.
 
 ```python
-from ChainableSoup import Pipeline, NestedArg, SpecalArg
+from chainsoup import Pipeline, NestedArg, SpecalArg
 
 # ... setup soup ...
 
@@ -219,7 +219,7 @@ When argument lists have different lengths, `SpecalArg` controls how the shorter
 
 ## Contributing
 
-Contributions are welcome! If you have a feature request, find a bug, or want to improve the documentation, please open an issue or submit a pull request on our [GitHub repository](https://github.com/your-username/chainablesoup).
+Contributions are welcome! If you have a feature request, find a bug, or want to improve the documentation, please open an issue or submit a pull request on our [GitHub repository](https://github.com/your-username/chainsoup).
 
 ## License
 
