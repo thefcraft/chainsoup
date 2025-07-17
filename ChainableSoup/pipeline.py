@@ -147,7 +147,7 @@ class PipelineSequenceFinal:
         return result
 
 
-class Pipeline:
+class Pipeline(PipelineElement):
     """
     Builds and executes a chain of commands to find a single BeautifulSoup Tag.
 
@@ -170,7 +170,9 @@ class Pipeline:
         # pipeline._runs = [_run.copy() for _run in self._runs] # BUG: may raise max-recurrsion error
         pipeline._runs = self._runs.copy()
         return pipeline
-    def run(self, soup: Tag) -> Tag | Error:
+    def _exec(self, value: Tag) -> Tag | Error: 
+        return self.run(value)
+    def run(self, value: Tag) -> Tag | Error:
         """
         Executes the pipeline starting from the given soup or tag.
 
@@ -180,12 +182,13 @@ class Pipeline:
         Returns:
             The final Tag if found, otherwise an `Error` object.
         """
-        result: Tag = soup
+        result: Tag = value
         for _run in self._runs:
             new_result = _run._exec(result)
             if isinstance(new_result, Error): return new_result
             result = new_result
         return result
+    __call__ = run
     def run_and_raise_for_error(self, soup: Tag) -> Tag:
         """
         Executes the pipeline and raises an exception on failure.
@@ -206,7 +209,23 @@ class Pipeline:
     @property
     def raise_for_error(self) -> PipelineFinal: 
         return PipelineFinal(self.copy())
-        
+    @overload
+    def join(self, run: "Pipeline") -> "Pipeline": ...
+    @overload
+    def join(self, run: "PipelineSequence") -> "PipelineSequence": ...
+    def join(self, run: "Pipeline | PipelineSequence") -> "Pipeline | PipelineSequence":
+        if isinstance(run, PipelineSequence):
+            pipelinesequence = PipelineSequence(
+                pipeline=self.join(run.pipeline),
+                solo_run=run._solo_run.copy()
+            )
+            pipelinesequence._runs = run._runs.copy()
+            if run._final_run is not None:
+                raise RuntimeError(f"Something Went Wrong. final_run is {run._final_run}.")
+            return pipelinesequence
+        pipeline = self.copy()
+        pipeline._runs.append(run.copy())
+        return pipeline
     @overload
     def find_tag(
         self,
@@ -422,7 +441,7 @@ class Pipeline:
         
 class Filter(PipelineSequenceElement):
     """A pipeline step that filters a sequence of tags using a function."""
-    def __init__(self, fn: Callable[[Tag], bool]) -> None:
+    def __init__(self, fn: Callable[[Tag], bool | Sequence[Tag] | Tag | Error]) -> None:
         self.fn = fn
     def _exec(self, value: Sequence[Tag]) -> Sequence[Tag]: 
         return [v for v in value if self.fn(v)]
@@ -430,7 +449,7 @@ class Filter(PipelineSequenceElement):
         return Filter(fn = self.fn)
 class EnumerateFilter(PipelineSequenceElement):
     """A pipeline step that filters a sequence of tags using a function that accepts index and tag."""
-    def __init__(self, fn: Callable[[int, Tag], bool]) -> None:
+    def __init__(self, fn: Callable[[int, Tag], bool | Sequence[Tag] | Tag | Error]) -> None:
         self.fn = fn
     def _exec(self, value: Sequence[Tag]) -> Sequence[Tag]: 
         return [v for idx, v in enumerate(value) if self.fn(idx, v)]
@@ -455,7 +474,7 @@ class EnumerateMap(PipelineSequenceElement):
     
 class AssertAll(PipelineSequenceElement):
     """A pipeline step that asserts a condition is true for all tags in a sequence using a function."""
-    def __init__(self, fn: Callable[[Tag], bool]) -> None:
+    def __init__(self, fn: Callable[[Tag], bool | Sequence[Tag] | Tag | Error]) -> None:
         self.fn = fn
     def _exec(self, value: Sequence[Tag]) -> Sequence[Tag] | AssertError: 
         if not all(self.fn(v) for v in value):
@@ -465,7 +484,7 @@ class AssertAll(PipelineSequenceElement):
         return AssertAll(fn = self.fn)
 class AssertEnumerateAll(PipelineSequenceElement):
     """A pipeline step that asserts a condition is true for all tags in a sequence using a function that accepts index and tag."""
-    def __init__(self, fn: Callable[[int, Tag], bool]) -> None:
+    def __init__(self, fn: Callable[[int, Tag], bool | Sequence[Tag] | Tag | Error]) -> None:
         self.fn = fn
     def _exec(self, value: Sequence[Tag]) -> Sequence[Tag] | AssertError: 
         if not all(self.fn(idx, v) for idx, v in enumerate(value)):
@@ -475,7 +494,7 @@ class AssertEnumerateAll(PipelineSequenceElement):
         return AssertEnumerateAll(fn = self.fn)
 class AssertAny(PipelineSequenceElement):
     """A pipeline step that asserts a condition is true for any tags in a sequence using a function."""
-    def __init__(self, fn: Callable[[Tag], bool]) -> None:
+    def __init__(self, fn: Callable[[Tag], bool | Sequence[Tag] | Tag | Error]) -> None:
         self.fn = fn
     def _exec(self, value: Sequence[Tag]) -> Sequence[Tag] | AssertError: 
         if not any(self.fn(v) for v in value):
@@ -485,7 +504,7 @@ class AssertAny(PipelineSequenceElement):
         return AssertAny(fn = self.fn)
 class AssertEnumerateAny(PipelineSequenceElement):
     """A pipeline step that asserts a condition is true for any tags in a sequence using a function that accepts index and tag."""
-    def __init__(self, fn: Callable[[int, Tag], bool]) -> None:
+    def __init__(self, fn: Callable[[int, Tag], bool | Sequence[Tag] | Tag | Error]) -> None:
         self.fn = fn
     def _exec(self, value: Sequence[Tag]) -> Sequence[Tag] | AssertError: 
         if not all(self.fn(idx, v) for idx, v in enumerate(value)):
@@ -567,7 +586,7 @@ class PipelineSequence(PipelineElement):
             if isinstance(new_result, Error): return new_result
             
         return new_result
-    
+    __call__ = run
     def run_and_raise_for_error(self, soup: Tag) -> Sequence[Tag]:
         """
         Executes the sequence pipeline and raises an exception on failure.
@@ -588,7 +607,7 @@ class PipelineSequence(PipelineElement):
     def raise_for_error(self) -> PipelineSequenceFinal: 
         return PipelineSequenceFinal(self.copy())
     
-    def filter(self, fn: Callable[[Tag], bool]) -> "PipelineSequence": 
+    def filter(self, fn: Callable[[Tag], bool | Sequence[Tag] | Tag | Error]) -> "PipelineSequence": 
         """
         Adds a filter operation to the sequence pipeline.
 
@@ -601,7 +620,7 @@ class PipelineSequence(PipelineElement):
         pipeline = self.copy()
         pipeline._runs.append(Filter(fn=fn))
         return pipeline
-    def enumerate_filter(self, fn: Callable[[int, Tag], bool]) -> "PipelineSequence": 
+    def enumerate_filter(self, fn: Callable[[int, Tag], bool | Sequence[Tag] | Tag | Error]) -> "PipelineSequence": 
         """
         Adds a filter operation to the sequence pipeline.
 
@@ -642,7 +661,7 @@ class PipelineSequence(PipelineElement):
         pipeline._runs.append(EnumerateMap(fn=fn))
         return pipeline
     
-    def assert_all(self, fn: Callable[[Tag], bool]) -> "PipelineSequence": 
+    def assert_all(self, fn: Callable[[Tag], bool | Sequence[Tag] | Tag | Error]) -> "PipelineSequence": 
         """
         Adds an assertion that all tags in the sequence satisfy a condition.
 
@@ -657,7 +676,7 @@ class PipelineSequence(PipelineElement):
         pipeline = self.copy()
         pipeline._runs.append(AssertAll(fn=fn))
         return pipeline
-    def assert_enumerate_all(self, fn: Callable[[int, Tag], bool]) -> "PipelineSequence": 
+    def assert_enumerate_all(self, fn: Callable[[int, Tag], bool | Sequence[Tag] | Tag | Error]) -> "PipelineSequence": 
         """
         Adds an assertion that all tags in the sequence satisfy a condition.
 
@@ -673,7 +692,7 @@ class PipelineSequence(PipelineElement):
         pipeline._runs.append(AssertEnumerateAll(fn=fn))
         return pipeline
     
-    def assert_any(self, fn: Callable[[Tag], bool]) -> "PipelineSequence": 
+    def assert_any(self, fn: Callable[[Tag], bool | Sequence[Tag] | Tag | Error]) -> "PipelineSequence": 
         """
         Adds an assertion that any tags in the sequence satisfy a condition.
 
@@ -688,7 +707,7 @@ class PipelineSequence(PipelineElement):
         pipeline = self.copy()
         pipeline._runs.append(AssertAny(fn=fn))
         return pipeline
-    def assert_enumerate_any(self, fn: Callable[[int, Tag], bool]) -> "PipelineSequence": 
+    def assert_enumerate_any(self, fn: Callable[[int, Tag], bool | Sequence[Tag] | Tag | Error]) -> "PipelineSequence": 
         """
         Adds an assertion that any tags in the sequence satisfy a condition.
 
