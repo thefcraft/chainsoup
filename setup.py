@@ -1,9 +1,14 @@
 from setuptools import setup, find_packages
-with open("readme.md", 'r') as f: 
-    long_description = f.read()
+
+try:
+    with open('readme.md', 'r') as f:
+        long_description = f.read()
+except FileNotFoundError as e:
+    long_description = "chainable is a simple pipeline-based interface for querying HTML/XML with BeautifulSoup."
+
 setup(
     name="chainsoup",
-    version="0.1.5",
+    version="0.1.6",
     author="ThefCraft",
     author_email="sisodiyalaksh@gmail.com",
     url="https://github.com/thefcraft/chainsoup",
