@@ -16,6 +16,7 @@ from .exceptions import Error, ElementNotFound, UnknownElement, AssertError, Ind
 from .types import Strainable
 
 T = TypeVar("T", bound=PageElement)
+TAny = TypeVar("TAny")
 
 class PipelineElement: 
     """Abstract base class for an operation on a single Tag."""
@@ -136,7 +137,17 @@ class PipelineFinal:
         if isinstance(result, Error):
             raise result
         return result
-
+    def transform(self, fn: Callable[[Tag], TAny]) -> "PipelineTransformFinal[TAny]":
+        return PipelineTransformFinal(self.pipeline, fn)
+class PipelineTransformFinal(Generic[TAny]):
+    def __init__(self, pipeline: "Pipeline", fn: Callable[[Tag], TAny]) -> None:
+        self.pipeline = pipeline
+        self.fn = fn
+    def run(self, soup: Tag) -> TAny:
+        result = self.pipeline.run(soup)
+        if isinstance(result, Error):
+            raise result
+        return self.fn(result)
 class PipelineSequenceFinal:
     def __init__(self, pipeline: "PipelineSequence") -> None:
         self.pipeline = pipeline
@@ -145,8 +156,17 @@ class PipelineSequenceFinal:
         if isinstance(result, Error):
             raise result
         return result
-
-
+    def transform(self, fn: Callable[[Sequence[Tag]], TAny]) -> "PipelineSequenceTransformFinal[TAny]":
+        return PipelineSequenceTransformFinal(self.pipeline, fn)
+class PipelineSequenceTransformFinal(Generic[TAny]):
+    def __init__(self, pipeline: "PipelineSequence", fn: Callable[[Sequence[Tag]], TAny]) -> None:
+        self.pipeline = pipeline
+        self.fn = fn
+    def run(self, soup: Tag) -> TAny:
+        result = self.pipeline.run(soup)
+        if isinstance(result, Error):
+            raise result
+        return self.fn(result)
 class Pipeline(PipelineElement):
     """
     Builds and executes a chain of commands to find a single BeautifulSoup Tag.
