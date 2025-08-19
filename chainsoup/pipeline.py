@@ -14,23 +14,24 @@ from bs4.element import Tag, NavigableString, PageElement
 from .args import resolve_value, Default, NestedNameArgBase, NestedNameArg, NestedAttrsArgBase, NestedRecursiveArg, NestedRecursiveArgBase, NestedStringArgBase, NestedStringArg, NestedAttrArgBase
 from .exceptions import Error, ElementNotFound, UnknownElement, AssertError, IndexOutError
 from .types import Strainable
+from .base import BasePipeline, BasePipelineFinal, BasePipelineElement
 
 T = TypeVar("T", bound=PageElement)
 TAny = TypeVar("TAny")
 
-class PipelineElement: 
+class PipelineElement(BasePipelineElement): 
     """Abstract base class for an operation on a single Tag."""
     def copy(self) -> "PipelineElement": raise NotImplementedError()
     def _exec(self, value: Tag) -> Tag | Error: raise NotImplementedError()
-class PipelineSequenceElement:
+class PipelineSequenceElement(BasePipelineElement):
     """Abstract base class for an operation on a sequence of Tags."""
     def copy(self) -> "PipelineSequenceElement": raise NotImplementedError()
     def _exec(self, value: Sequence[Tag]) -> Sequence[Tag] | Error: raise NotImplementedError()
-class Pipeline2SequenceElement:
+class Pipeline2SequenceElement(BasePipelineElement):
     """Abstract base class for an operation that converts a Tag to a sequence of Tags."""
     def copy(self) -> "Pipeline2SequenceElement": raise NotImplementedError()
     def _exec(self, value: Tag) -> Sequence[Tag] | Error: raise NotImplementedError()
-class Sequence2PipelineElement:
+class Sequence2PipelineElement(BasePipelineElement):
     """Abstract base class for an operation that converts a sequence of Tags to a single Tag."""
     def copy(self) -> "Sequence2PipelineElement": raise NotImplementedError()
     def _exec(self, value: Sequence[Tag]) -> Tag | Error: raise NotImplementedError()
@@ -129,7 +130,7 @@ class FindAllTags(Pipeline2SequenceElement):
             **self.kwargs,   
         )
 
-class PipelineFinal:
+class PipelineFinal(BasePipelineFinal):
     def __init__(self, pipeline: "Pipeline") -> None:
         self.pipeline = pipeline
     def run(self, soup: Tag) -> Tag:
@@ -139,7 +140,7 @@ class PipelineFinal:
         return result
     def transform(self, fn: Callable[[Tag], TAny]) -> "PipelineTransformFinal[TAny]":
         return PipelineTransformFinal(self.pipeline, fn)
-class PipelineTransformFinal(Generic[TAny]):
+class PipelineTransformFinal(BasePipelineFinal, Generic[TAny]):
     def __init__(self, pipeline: "Pipeline", fn: Callable[[Tag], TAny]) -> None:
         self.pipeline = pipeline
         self.fn = fn
@@ -148,7 +149,7 @@ class PipelineTransformFinal(Generic[TAny]):
         if isinstance(result, Error):
             raise result
         return self.fn(result)
-class PipelineSequenceFinal:
+class PipelineSequenceFinal(BasePipelineFinal):
     def __init__(self, pipeline: "PipelineSequence") -> None:
         self.pipeline = pipeline
     def run(self, soup: Tag) -> Sequence[Tag]:
@@ -158,7 +159,7 @@ class PipelineSequenceFinal:
         return result
     def transform(self, fn: Callable[[Sequence[Tag]], TAny]) -> "PipelineSequenceTransformFinal[TAny]":
         return PipelineSequenceTransformFinal(self.pipeline, fn)
-class PipelineSequenceTransformFinal(Generic[TAny]):
+class PipelineSequenceTransformFinal(BasePipelineFinal, Generic[TAny]):
     def __init__(self, pipeline: "PipelineSequence", fn: Callable[[Sequence[Tag]], TAny]) -> None:
         self.pipeline = pipeline
         self.fn = fn

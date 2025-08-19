@@ -8,7 +8,7 @@ except FileNotFoundError as e:
 
 setup(
     name="chainsoup",
-    version="0.1.7",
+    version="0.1.8",
     author="ThefCraft",
     author_email="sisodiyalaksh@gmail.com",
     url="https://github.com/thefcraft/chainsoup",
